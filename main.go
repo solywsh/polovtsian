@@ -3,30 +3,37 @@ package main
 
 import (
 	"github.com/solywsh/polovtsian/pin"
+	"log"
 	"net/http"
+	"time"
 )
+
+func onlyForV2() pin.HandlerFunc {
+	return func(c *pin.Context) {
+		// Start timer
+		t := time.Now()
+		// if a server error occurred
+		c.Fail(500, "Internal Server Error")
+		// Calculate resolution time
+		log.Printf("[%d] %s in %v for group v2", c.StatusCode, c.Req.RequestURI, time.Since(t))
+	}
+}
 
 func main() {
 	r := pin.New()
-
+	r.Use(pin.Logger()) // global midlleware
 	r.GET("/", func(c *pin.Context) {
-		c.HTML(http.StatusOK, "<h1>Hello Gee</h1>")
+		c.HTML(http.StatusOK, "<h1>Hello pin</h1>")
 	})
 
-	r.GET("/hello", func(c *pin.Context) {
-		// expect /hello?name=solywsh
-		c.String(http.StatusOK, "hello %s, you're at %s\n", c.Query("name"), c.Path)
-	})
-
-	r.GET("/hello/:name", func(c *pin.Context) {
-		// expect /hello/solywsh
-		c.String(http.StatusOK, "hello %s, you're at %s\n", c.Param("name"), c.Path)
-	})
-
-	r.GET("/assets/*filepath", func(c *pin.Context) {
-		c.JSON(http.StatusOK, pin.H{"filepath": c.Param("filepath")})
-	})
+	v2 := r.Group("/v2")
+	v2.Use(onlyForV2()) // v2 group middleware
+	{
+		v2.GET("/hello/:name", func(c *pin.Context) {
+			// expect /hello/solywsh
+			c.String(http.StatusOK, "hello %s, you're at %s\n", c.Param("name"), c.Path)
+		})
+	}
 
 	r.Run(":9999")
-
 }
